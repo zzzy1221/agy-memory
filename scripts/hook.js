@@ -3,16 +3,17 @@
 /**
  * agy-memory · SessionStart / PreInvocation hook
  *
- * Antigravity hook 契约（builtin/skills/agy-customizations/docs/hooks.md）：
+ * Antigravity hook contract (builtin/skills/agy-customizations/docs/hooks.md):
  *   stdin  = JSON（conversationId / workspacePaths / lastUserInput ...）
  *   stdout = {"injectSteps":[{"systemMessage":{"systemMessage":"..."}}]}
  *
- * 设计取舍：**只注入，不往工作区写文件**。
- * 把记忆块写进 <workspace>/.agents/AGENTS.md 会让它出现在 git status 里，等于
- * 替用户改了仓库。所以上下文走 systemMessage，需要落文件的人自己调 memory_sync。
+ * Design choice: inject only, never write into the workspace.
+ * Writing the memory block into <workspace>/.agents/AGENTS.md would show up in
+ * git status, i.e. modifying the user's repo behind their back. Context goes
+ * through systemMessage instead; call memory_sync if you actually want a file.
  *
- * 频次控制：SessionStart 必注入；PreInvocation 只在记忆 hash 变化时补一次，
- * 避免每轮重复烧 token。
+ * Frequency: SessionStart always injects; PreInvocation only tops up when the
+ * memory hash changed, so unchanged libraries cost no tokens.
  */
 const path = require("node:path");
 const fs = require("node:fs");
@@ -35,7 +36,7 @@ function parsePayload(raw) {
   }
 }
 
-/** 从 hook payload 里取工作区；file:// 与 Windows 反斜杠都要认 */
+/** Extract the workspace from the hook payload; handle file:// and Windows paths */
 function pickWorkspace(payload) {
   const list = payload.workspacePaths || payload.workspace_uris || [];
   const first = Array.isArray(list) ? list[0] : list;
@@ -96,7 +97,7 @@ function main() {
 try {
   main();
 } catch (err) {
-  // hook 失败绝不能挡住 agent
+  // A failing hook must never wedge the agent
   emit([]);
   if (process.env.AGY_MEMORY_DEBUG) process.stderr.write(String((err && err.stack) || err) + "\n");
 }

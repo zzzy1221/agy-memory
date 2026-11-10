@@ -1,16 +1,16 @@
 "use strict";
 /**
- * agy-memory · 存储层
- * 纯 Node 标准库，无第三方依赖。
+ * agy-memory · storage layer
+ * Node standard library only, no third-party dependencies.
  *
- * 轨道（对应 dsh-memory-evolve 的分层）：
- *   MEMORY.md                全局事实（跨项目）
- *   USER.md                  用户档案
- *   projects/<slug>.md       项目日志
- *   projects/<slug>.key.md   项目关键记忆（每轮注入）
- *   daily/<YYYY-MM-DD>.md    每日日志
- *   suggestions.jsonl        待确认的关键记忆队列
- *   archive/                 归档（删除条目的原文，可逆）
+ * Tracks:
+ *   MEMORY.md                global facts (cross-project)
+ *   USER.md                  user profile
+ *   projects/<slug>.md       per-project log
+ *   projects/<slug>.key.md   project key memory (injected every turn)
+ *   daily/<YYYY-MM-DD>.md    daily log
+ *   suggestions.jsonl        pending key-memory proposals
+ *   archive/                 archived deletions (reversible)
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -63,7 +63,7 @@ function writeJson(p, obj) {
   fs.writeFileSync(p, JSON.stringify(obj, null, 2), "utf8");
 }
 
-/** 工作区路径 → 稳定的项目 slug：目录名 + 路径短哈希 */
+/** Workspace path -> stable project slug: directory name + short path hash */
 function slug(workspacePath) {
   if (!workspacePath) return "global";
   const norm = path.resolve(String(workspacePath)).replace(/[\\/]+$/, "");
@@ -72,7 +72,7 @@ function slug(workspacePath) {
   return `${base}-${h}`;
 }
 
-/** 解析 `- [YYYY-MM-DD] 内容` 形式的条目（续行缩进两格） */
+/** Parse entries shaped `- [YYYY-MM-DD] body` (continuation lines indented two spaces) */
 function parseEntries(text) {
   const out = [];
   let cur = null;
@@ -118,7 +118,7 @@ function appendEntry(p, text, date) {
   return block;
 }
 
-/** 轨道解析：返回 {file, entries} */
+/** Resolve a track name to its file path */
 function trackFile(track, opts = {}) {
   const s = opts.projectSlug || slug(opts.projectPath);
   switch (track) {
@@ -142,7 +142,7 @@ function listEntries(track, opts = {}) {
   return parseEntries(read(file)).map((e) => ({ ...e, file, track }));
 }
 
-/** 唯一的子串匹配 → 移除该条目并归档 */
+/** Remove the single matching entry and archive it */
 function removeEntry(track, match, opts = {}) {
   const file = trackFile(track, opts);
   const entries = parseEntries(read(file));
@@ -164,7 +164,7 @@ function removeEntry(track, match, opts = {}) {
   return { removed: 1, archivedTo: F.archive(`${path.basename(file, ".md")}-archive.md`), entry: hits[0].text };
 }
 
-/** 跨轨搜索：关键字命中，返回 文件 / 行号 / 命中行 */
+/** Cross-track search: substring hits with file / line / text */
 function search(query, opts = {}) {
   const q = String(query || "").trim();
   if (!q) throw new Error("query must not be empty");
@@ -211,7 +211,7 @@ function search(query, opts = {}) {
   return hits;
 }
 
-/** 关键记忆：写进待确认队列（对齐 dsh 的 target=key 门禁） */
+/** Queue a key-memory proposal; it only takes effect after confirmation */
 function suggestKey({ content, summary, projectSlug, projectPath }) {
   const s = projectSlug || slug(projectPath);
   const item = {
@@ -254,7 +254,7 @@ function rewriteSuggestions(mutate) {
   fs.writeFileSync(F.suggestions, out.filter(Boolean).map((o) => JSON.stringify(o)).join("\n") + (out.length ? "\n" : ""), "utf8");
 }
 
-/** 确认一条待定关键记忆 → 写进 projects/<slug>.key.md */
+/** Confirm a pending proposal -> write it into projects/<slug>.key.md */
 function promoteKey(match, opts = {}) {
   const s = opts.projectSlug || slug(opts.projectPath);
   const pending = listSuggestions();
@@ -292,7 +292,7 @@ function counts(projectSlug) {
   };
 }
 
-/* ---------- 上下文注入 ---------- */
+/* ---------- context injection ---------- */
 
 function tail(entries, budget) {
   const picked = [];

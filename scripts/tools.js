@@ -1,6 +1,6 @@
 /**
- * agy-memory · 工具定义（英文，面向社区）
- * 中文版说明见 docs/rules.zh-CN.md 与 docs/tools.zh-CN.md。
+ * agy-memory · tool definitions
+ * Chinese rule set: docs/rules.zh-CN.md
  */
 const T = [
   {
@@ -141,6 +141,3 @@ const T = [
 
 module.exports = { T };
 
-// 兼容旧引用名
-const TOOLS = T;
-module.exports.TOOLS = TOOLS;

@@ -2,15 +2,15 @@
 "use strict";
 /**
  * agy-memory · MCP stdio server
- * 协议：JSON-RPC 2.0 over stdio（LSP 风格 Content-Length 头不做，MCP stdio 用换行分帧的 NDJSON）
- * 只依赖 Node 标准库。
+ * Protocol: JSON-RPC 2.0 over stdio, newline-delimited (MCP stdio framing).
+ * Node standard library only.
  */
 const path = require("node:path");
 const lib = require("./memory-lib.js");
 
 const SERVER = { name: "agy-memory", version: "1.0.0" };
 
-/** 项目路径解析优先级：显式参数 > 环境变量 > 进程 cwd */
+/** Project resolution order: explicit arg > env var > process cwd */
 function resolveProject(args = {}) {
   const p = args.project || process.env.AGY_MEMORY_PROJECT || process.cwd();
   return { projectPath: path.resolve(p), projectSlug: lib.slug(p) };
@@ -92,7 +92,7 @@ function callTool(name, args = {}) {
   }
 }
 
-/* ---------------- JSON-RPC 主循环 ---------------- */
+/* ---------------- JSON-RPC main loop ---------------- */
 
 function send(msg) {
   process.stdout.write(JSON.stringify(msg) + "\n");
@@ -128,7 +128,7 @@ process.stdin.on("data", (chunk) => {
 
 function handle(req) {
   const { id, method, params } = req || {};
-  // 通知（无 id）不需要回包
+  // Notifications (no id) get no reply
   if (id === undefined || id === null) {
     if (method === "notifications/initialized") return;
     return;
