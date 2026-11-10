@@ -29,7 +29,7 @@ function renderIntoAgentsMd(projectPath, budget) {
   let old = lib.read(file);
   const block = ctx.text
     ? `${BEGIN}\n${ctx.text}\n${END}`
-    : `${BEGIN}\n（记忆库还是空的。收尾时用 memory_add 写 1 条。）\n${END}`;
+    : `${BEGIN}\n(the library is empty; write one entry with memory_add when wrapping up)\n${END}`;
   let next;
   const i = old.indexOf(BEGIN);
   const j = old.indexOf(END);
@@ -88,7 +88,7 @@ function callTool(name, args = {}) {
     case "memory_sync":
       return renderIntoAgentsMd(projectPath, args.budget);
     default:
-      throw new Error(`未知工具: ${name}`);
+      throw new Error(`Unknown tool: ${name}`);
   }
 }
 
@@ -119,7 +119,7 @@ process.stdin.on("data", (chunk) => {
     try {
       req = JSON.parse(line);
     } catch {
-      replyError(null, -32700, "JSON 解析失败");
+      replyError(null, -32700, "JSON parse error");
       continue;
     }
     handle(req);
@@ -159,11 +159,11 @@ function handle(req) {
       case "prompts/list":
         return reply(id, { prompts: [] });
       default:
-        return replyError(id, -32601, `不支持的方法: ${method}`);
+        return replyError(id, -32601, `Unsupported method: ${method}`);
     }
   } catch (err) {
     if (method === "tools/call") {
-      return reply(id, { content: [{ type: "text", text: `错误: ${err.message}` }], isError: true });
+      return reply(id, { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true });
     }
     return replyError(id, -32603, err.message);
   }

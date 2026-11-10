@@ -133,7 +133,7 @@ function trackFile(track, opts = {}) {
     case "daily":
       return F.daily(opts.date || today());
     default:
-      throw new Error(`未知轨道: ${track}（可用: ${TRACKS.join(" / ")}）`);
+      throw new Error(`Unknown track: ${track} (available: ${TRACKS.join(" / ")})`);
   }
 }
 
@@ -147,11 +147,11 @@ function removeEntry(track, match, opts = {}) {
   const file = trackFile(track, opts);
   const entries = parseEntries(read(file));
   const hits = entries.filter((e) => e.text.includes(match));
-  if (!hits.length) return { removed: 0, reason: "没有条目包含这段文字" };
+  if (!hits.length) return { removed: 0, reason: "no entry contains that text" };
   if (hits.length > 1) {
     return {
       removed: 0,
-      reason: `${hits.length} 条都包含这段文字，需要更精确的匹配片段`,
+      reason: `${hits.length} entries contain that text; a more specific fragment is needed`,
       candidates: hits.slice(0, 5).map((e) => e.text.split("\n")[0].slice(0, 60)),
     };
   }
@@ -167,7 +167,7 @@ function removeEntry(track, match, opts = {}) {
 /** 跨轨搜索：关键字命中，返回 文件 / 行号 / 命中行 */
 function search(query, opts = {}) {
   const q = String(query || "").trim();
-  if (!q) throw new Error("query 不能为空");
+  if (!q) throw new Error("query must not be empty");
   const needle = q.toLowerCase();
   const tracks = opts.tracks && opts.tracks.length ? opts.tracks : TRACKS;
   const limit = Math.min(Number(opts.limit) || 20, 60);
@@ -222,7 +222,7 @@ function suggestKey({ content, summary, projectSlug, projectPath }) {
     at: new Date().toISOString(),
     status: "pending",
   };
-  if (!item.content) throw new Error("content 不能为空");
+  if (!item.content) throw new Error("content must not be empty");
   ensureDir(path.dirname(F.suggestions));
   fs.appendFileSync(F.suggestions, JSON.stringify(item) + "\n", "utf8");
   return item;
@@ -259,8 +259,8 @@ function promoteKey(match, opts = {}) {
   const s = opts.projectSlug || slug(opts.projectPath);
   const pending = listSuggestions();
   const hits = pending.filter((o) => o.id === match || o.content.includes(match) || o.summary.includes(match));
-  if (!hits.length) return { promoted: 0, reason: "没有匹配的待确认条目" };
-  if (hits.length > 1) return { promoted: 0, reason: "匹配到多条，给 id 或更精确的片段", candidates: hits.map((o) => ({ id: o.id, summary: o.summary })) };
+  if (!hits.length) return { promoted: 0, reason: "no matching pending entry" };
+  if (hits.length > 1) return { promoted: 0, reason: "multiple matches; pass an id or a more specific fragment", candidates: hits.map((o) => ({ id: o.id, summary: o.summary })) };
   const item = hits[0];
   appendEntry(F.projectKey(item.project || s), item.content);
   rewriteSuggestions((o) => (o.id === item.id ? { ...o, status: "confirmed", confirmedAt: new Date().toISOString() } : o));
@@ -269,7 +269,7 @@ function promoteKey(match, opts = {}) {
 
 function dropSuggestion(id) {
   const target = listSuggestions().find((o) => o.id === id);
-  if (!target) return { dropped: 0, reason: `没有 id=${id} 的待确认条目` };
+  if (!target) return { dropped: 0, reason: `no pending entry with id=${id}` };
   rewriteSuggestions((o) => (o.id === id ? { ...o, status: "dropped", droppedAt: new Date().toISOString() } : o));
   return { dropped: 1, id, summary: target.summary };
 }
@@ -310,28 +310,28 @@ function tail(entries, budget) {
 function buildContext(opts = {}) {
   const s = opts.projectSlug || slug(opts.projectPath);
   const budget = Number(opts.budget) || 7000;
-  const userName = opts.workspaceName || "本项目";
+  const userName = opts.workspaceName || "this project";
 
   const sections = [];
   const add = (title, entries, cap) => {
     if (!entries.length) return;
     const { picked, omitted } = tail(entries, cap);
-    sections.push(`### ${title}\n${picked}${omitted > 0 ? `\n（另有 ${omitted} 条较早条目未展开，用 memory_search 查）` : ""}`);
+    sections.push(`### ${title}\n${picked}${omitted > 0 ? `\n(${omitted} older entries not expanded; use memory_search to find them)` : ""}`);
   };
 
-  add("全局（MEMORY.md）", parseEntries(read(F.memory)), Math.round(budget * 0.26));
-  add("用户（USER.md）", parseEntries(read(F.user)), Math.round(budget * 0.16));
-  add(`本项目关键 · ${userName}`, parseEntries(read(F.projectKey(s))), Math.round(budget * 0.32));
-  add("今天", parseEntries(read(F.daily(today()))), Math.round(budget * 0.18));
+  add("Global (MEMORY.md)", parseEntries(read(F.memory)), Math.round(budget * 0.26));
+  add("User (USER.md)", parseEntries(read(F.user)), Math.round(budget * 0.16));
+  add(`Project key · ${userName}`, parseEntries(read(F.projectKey(s))), Math.round(budget * 0.32));
+  add("Today", parseEntries(read(F.daily(today()))), Math.round(budget * 0.18));
 
   if (!sections.length) return { text: "", hash: "empty", counts: counts(s) };
 
   const body = [
-    "## 长期记忆 · agy-memory（本机记忆库，跨会话有效）",
+    "## Long-term memory · agy-memory (local, persists across sessions)",
     "",
     sections.join("\n\n"),
     "",
-    "> 收尾时用 memory_add 写 1 条 daily；长期约定/架构/踩坑先走 target=key 进待确认队列，别直接改注入内容。",
+    "> When wrapping up, write one daily entry with memory_add. Standing agreements, architecture decisions and recurring pitfalls go through memory_suggest_key (target=key) and wait for confirmation; do not edit injected content directly.",
   ].join("\n");
 
   const hash = crypto.createHash("sha1").update(body).digest("hex").slice(0, 12);

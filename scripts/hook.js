@@ -59,7 +59,7 @@ function main() {
   const payload = parsePayload(readStdin());
   const projectPath = pickWorkspace(payload);
   const budget = Number(process.env.AGY_MEMORY_BUDGET) || 7000;
-  const workspaceName = path.basename(projectPath) || "本项目";
+  const workspaceName = path.basename(projectPath) || "this project";
 
   const ctx = lib.buildContext({ projectPath, budget, workspaceName });
   const state = lib.readState();
@@ -76,7 +76,7 @@ function main() {
         systemMessage: {
           systemMessage:
             ctx.text +
-            `\n\n（记忆库 ${lib.HOME} · 写用 memory_add · 查用 memory_search · 整理用 memory_list/remove）`,
+            `\n\n(memory library ${lib.HOME} · write with memory_add · search with memory_search · tidy with memory_list/memory_remove)`,
         },
       },
     ]);
