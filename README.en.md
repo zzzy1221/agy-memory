@@ -24,19 +24,21 @@ Fully local. Zero dependencies. No network, no API key, no cost.
                                   └── suggestions.jsonl
 ```
 
-## Why not one of the existing memory plugins
+## Design trade-offs
 
-Three of them support Antigravity, and all three are good at something this is not:
+This plugin is built around four hard constraints. Each one maps to a concrete decision:
 
-| | Model | Trade-off |
-|---|---|---|
-| **Mem0** | Hosted MCP + API key | Server-side extraction into a vector store. Cloud, paid, and the direction is opposite: it summarizes, it does not keep a readable store. |
-| **MemPalace** | Local ChromaDB | Excellent **archive** — verbatim storage, semantic search. Needs Python 3.10+, uv, ~300MB of embedding model. It answers "find the session where we discussed X", not "what are the standing rules here". |
-| **agentmemory** | Local BM25, daemon on :3111 | 54 tools, a viewer, a resident process. Great if you want a memory product; heavy if you want memory in your editor. |
+**1. Spend only what you are already spending.** No extra API key, no separate extraction or summarisation model. Memory is written by the model already in the conversation, in one tool call — no additional round trip.
 
-`agy-memory` takes a fourth position: **layered Markdown tracks, injected every session, written by the model in one call.** No daemon, no embeddings, no Python. When it breaks you open a `.md` file and read it.
+**2. No network.** Memory lives in `~/.antigravity-memory/` on your machine. No outbound requests, no account, no server that needs to know what you remembered.
 
-That also means it is honest about its ceiling: **no semantic search.** `memory_search` is substring matching. At a few hundred entries that is fine; at tens of thousands you want MemPalace.
+**3. Markdown, not a database.** The upside is that it is readable, diffable, hand-editable, and drops straight into whatever backup you already run. If the plugin breaks or you stop using it, the memory does not go with it — you open the file and read it, no tooling required.
+
+**4. Not resident.** No background process, no port, no autostart. It exists in exactly two moments: when Antigravity runs a hook, and when Antigravity calls a tool. The rest of the time it is not there, using no memory and no power.
+
+The boundary that comes with those choices: **no semantic search.** `memory_search` is substring matching — fine for a few hundred entries, strained at tens of thousands. That is the price of zero dependencies, zero cost, fully local, and a store you can read and edit, and it is stated up front rather than buried.
+
+If you need large-scale semantic retrieval or a shared team memory store, that is a different product direction, and this plugin is not aimed at it.
 
 ## Install
 
