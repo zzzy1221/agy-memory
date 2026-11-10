@@ -252,7 +252,7 @@ rm -rf ~/.gemini/config/plugins/agy-memory
 
 ## 许可
 
-MIT，详见 [LICENSE](LICENSE)。
+MIT，详见 [LICENSE](LICENSE)。第三方声明见 [NOTICE](NOTICE)。
 
 ## 来源与致谢
 

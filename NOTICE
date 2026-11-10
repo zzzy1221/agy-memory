@@ -1,0 +1,38 @@
+# NOTICE
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE).
+
+The MIT text applies to this project's own code. The third-party attribution
+below is a separate notice and is not part of the license grant.
+
+## Third-party attribution
+
+The layered memory design in this project is derived from dsh-memory-evolve:
+
+```
+dsh-memory-evolve
+https://github.com/csyangwen/dsh-memory-evolve
+MIT License
+Copyright (c) 2026 dsh-external
+```
+
+No source code from that project is included here. What was adopted is the
+design concept only:
+
+- five-track layering of memory
+- injection at session start rather than full-context loading
+- a two-step confirmation path for entries injected every turn
+- archiving deletions rather than erasing them
+- writing a single entry when a turn ends
+
+The implementation in this repository is independent and targets Google
+Antigravity. The upstream project targets DeepSeek Harness via the Cordis
+plugin framework; the two share no code.
+
+The upstream project's MIT License continues to apply to its own code. Full
+details in [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md).
+
+## Dependencies
+
+None. This project uses only the Node.js standard library (`fs`, `path`, `os`,
+`crypto`) and ships no third-party packages.

@@ -252,7 +252,7 @@ The memory library is located at `~/.antigravity-memory/`, independent of the pl
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Third-party notices in [NOTICE](NOTICE).
 
 ## Attribution
 
