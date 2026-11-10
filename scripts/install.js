@@ -185,11 +185,19 @@ function main() {
     for (const f of ["hooks.json", "mcp_config.json"]) {
       const p = path.join(TARGET, f);
       if (fs.existsSync(p)) {
-        if (!DRY) fs.unlinkSync(p);
-        console.log("  removed " + p);
+        if (!DRY) {
+          fs.unlinkSync(p);
+          console.log("  removed " + p);
+        } else {
+          console.log("  would remove " + p);
+        }
       }
     }
-    console.log("\nHook and MCP config removed. The memory library is kept at ~/.antigravity-memory/");
+    console.log(
+      DRY
+        ? "\nDry run: nothing was removed."
+        : "\nHook and MCP config removed. The memory library is kept at ~/.antigravity-memory/"
+    );
     return;
   }
 
