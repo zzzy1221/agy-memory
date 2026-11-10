@@ -1,5 +1,5 @@
 {
-  "_comment": "模板。请勿手改本文件 —— 运行 `node scripts/install.js` 会按本机路径生成真正的 hooks.json（覆盖同目录同名文件）。",
+  "_comment": "Template. Do not edit by hand: `node scripts/install.js` generates the real hooks.json next to this file, using your machine's absolute paths.",
   "agy-memory-session": {
     "SessionStart": [
       {
