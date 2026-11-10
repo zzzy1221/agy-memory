@@ -1,0 +1,21 @@
+{
+  "_comment": "模板。请勿手改本文件 —— 运行 `node scripts/install.js` 会按本机路径生成真正的 hooks.json（覆盖同目录同名文件）。",
+  "agy-memory-session": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "<PLUGIN_ROOT>/scripts/hook.cmd SessionStart",
+        "timeout": 15
+      }
+    ]
+  },
+  "agy-memory-recall": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "<PLUGIN_ROOT>/scripts/hook.cmd PreInvocation",
+        "timeout": 10
+      }
+    ]
+  }
+}

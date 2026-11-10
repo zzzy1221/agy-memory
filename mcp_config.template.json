@@ -1,0 +1,10 @@
+{
+  "_comment": "模板。请勿手改本文件 —— 运行 `node scripts/install.js` 会按本机路径生成真正的 mcp_config.json（覆盖同目录同名文件）。",
+  "mcpServers": {
+    "agy-memory": {
+      "command": "<NODE_PATH>",
+      "args": ["<PLUGIN_ROOT>/scripts/server.js"],
+      "env": {}
+    }
+  }
+}

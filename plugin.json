@@ -1,0 +1,12 @@
+{
+  "name": "agy-memory",
+  "displayName": "Long-term Memory",
+  "version": "1.0.0",
+  "description": "Cross-session long-term memory for Antigravity: layered Markdown tracks (global / user / project / project-key / daily), auto-injected at session start, written back with one memory_add call. Fully local, zero dependencies, no network.",
+  "suggestedPrompts": [
+    "Do you remember what I said about this project's build script",
+    "Save what we agreed on into long-term memory",
+    "Have we hit this error before? Search memory"
+  ],
+  "author": { "name": "agy-memory contributors" }
+}

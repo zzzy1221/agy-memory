@@ -1,0 +1,9 @@
+# Shell launchers must keep LF, otherwise macOS/Linux fails with "bad interpreter".
+*.sh text eol=lf
+
+# Windows launchers must keep CRLF, otherwise cmd.exe can misparse them.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Everything else: normalise to LF in the repo, native on checkout.
+* text=auto
