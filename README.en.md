@@ -1,149 +1,254 @@
 # agy-memory
 
-> English (current) · [中文](README.md)
+Cross-session long-term memory for Google Antigravity.
 
-Cross-session long-term memory for [Google Antigravity](https://antigravity.google).
+> English · [中文](README.md)
 
-Your agent forgets everything between sessions. This plugin gives it a memory that **survives**, and injects the relevant part into context before it starts thinking.
+---
 
-Fully local. Zero dependencies. No network, no API key, no cost.
+## Overview
+
+Each new Antigravity conversation starts from an empty context. Agreements, conclusions, and lessons established in earlier sessions are not retained. This plugin injects memory into the context at session start, so the model has access to project-relevant history before it begins reasoning.
+
+All data is stored locally. No outbound network requests, no API keys, no additional cost.
+
+## How it works
 
 ```
-┌─ SessionStart hook ─────────────────────────────┐
-│  global  +  user  +  project-key  +  today      │  ──►  injected into context
-└─────────────────────────────────────────────────┘
-              ▲                        │
-              │                        ▼
-        memory_add ...          ~/.antigravity-memory/
-                                  ├── MEMORY.md
-                                  ├── USER.md
-                                  ├── projects/<slug>.md
-                                  ├── projects/<slug>.key.md
-                                  ├── daily/2026-01-01.md
-                                  ├── archive/
-                                  └── suggestions.jsonl
+                ┌──────────────────────────┐
+   SessionStart │  global + user + project │ ──► injected as system message
+      hook      │      key + today         │
+                └──────────────────────────┘
+                             ▲
+                             │ memory_add
+                             │
+                ~/.antigravity-memory/
+                  ├── MEMORY.md              global facts
+                  ├── USER.md                user preferences
+                  ├── projects/<slug>.md     project log
+                  ├── projects/<slug>.key.md project key memory (injected every turn)
+                  ├── daily/YYYY-MM-DD.md    daily log
+                  ├── archive/               archived deletions
+                  └── suggestions.jsonl      pending proposals
 ```
 
-## Design trade-offs
+At session start the `SessionStart` hook assembles four sources — global facts, user preferences, project key memory, and the current day's log — and injects them into context. After memory changes, the `PreInvocation` hook compares a content hash and tops up the injection only when needed, avoiding repeated token cost.
 
-This plugin is built around four hard constraints. Each one maps to a concrete decision:
+## Design constraints
 
-**1. Spend only what you are already spending.** No extra API key, no separate extraction or summarisation model. Memory is written by the model already in the conversation, in one tool call — no additional round trip.
+The plugin is built around four constraints, each mapping to a specific implementation decision.
 
-**2. No network.** Memory lives in `~/.antigravity-memory/` on your machine. No outbound requests, no account, no server that needs to know what you remembered.
+**1. No additional call cost**
+No separate API key, no extra extraction or summarisation model. Memory is written by the model already in the conversation through a single tool call, producing no additional model requests.
 
-**3. Markdown, not a database.** The upside is that it is readable, diffable, hand-editable, and drops straight into whatever backup you already run. If the plugin breaks or you stop using it, the memory does not go with it — you open the file and read it, no tooling required.
+**2. No network communication**
+Memory is stored in `~/.antigravity-memory/` on the local machine. There are no outbound requests, no account registration, and no server involvement.
 
-**4. Not resident.** No background process, no port, no autostart. It exists in exactly two moments: when Antigravity runs a hook, and when Antigravity calls a tool. The rest of the time it is not there, using no memory and no power.
+**3. Markdown as the storage format**
+This allows reading, version control, manual editing, and inclusion in existing backup workflows. If the plugin stops being used or fails, the memory data itself is unaffected and can be read with a text editor without additional tooling.
 
-The boundary that comes with those choices: **no semantic search.** `memory_search` is substring matching — fine for a few hundred entries, strained at tens of thousands. That is the price of zero dependencies, zero cost, fully local, and a store you can read and edit, and it is stated up front rather than buried.
+**4. No resident process**
+No background process, no listening port, no autostart. The plugin executes only during hook invocation and tool calls, and consumes no system resources otherwise.
 
-If you need large-scale semantic retrieval or a shared team memory store, that is a different product direction, and this plugin is not aimed at it.
+## Scope and limits
 
-## Install
+Retrieval is **substring matching**, with no semantic search. A few hundred entries are well served; at tens of thousands, retrieval performance degrades. This is a direct consequence of the four constraints above — zero dependencies, zero cost, fully local, readable and editable.
 
-Requires **Node.js 18+**. Antigravity must already be installed.
+Large-scale semantic retrieval or a shared team memory store requires a different technical approach.
+
+## Requirements
+
+| Item | Requirement |
+|---|---|
+| Node.js | 18 or later |
+| Antigravity | Installed and working |
+
+## Installation
 
 ```bash
-git clone https://github.com/<your-account>/agy-memory.git
+git clone https://github.com/zzzy1221/agy-memory.git
 cd agy-memory
 node scripts/install.js
 ```
 
-Or, once you have a copy by any means (tarball, zip, another machine), just run the installer from the plugin directory — it does not need git.
+Git is not required for installation. The plugin may be obtained as an archive or copied from another machine, provided the install script is run from the plugin directory.
 
-The installer copies the plugin to `~/.gemini/config/plugins/agy-memory/`, then **writes `hooks.json` and `mcp_config.json` with your machine's absolute paths** and self-checks them.
+The install script performs three operations:
 
-That last part is not laziness — see [Why the installer exists](#why-the-installer-exists).
+1. Copies the plugin to `~/.gemini/config/plugins/agy-memory/`
+2. Generates `hooks.json` and `mcp_config.json` using local absolute paths
+3. Verifies the generated paths exist and that commands are not quoted
 
-Options:
+Step 2 is mandatory rather than optional; see [Why an install script is required](#why-an-install-script-is-required).
 
-```bash
-node scripts/install.js --dry-run          # print what would be written
-node scripts/install.js --no-hooks         # MCP tools only, no auto-injection
-node scripts/install.js --uninstall        # remove hook + MCP config (keeps the library)
-AGY_PLUGIN_DIR=/custom/path node scripts/install.js
+### Command-line options
+
+| Option | Description |
+|---|---|
+| `--dry-run` | Print what would be written without modifying the filesystem |
+| `--no-hooks` | Install MCP tools only, without automatic injection |
+| `--uninstall` | Remove hook and MCP configuration, retaining the memory library |
+| `AGY_PLUGIN_DIR=<path>` | Specify the installation directory |
+
+Antigravity hot-loads plugins; a restart is usually unnecessary. If the plugin does not take effect, restart once.
+
+### Verifying the installation
+
+Windows (PowerShell):
+
+```powershell
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"memory_status","arguments":{}}}' | node "$env:USERPROFILE\.gemini\config\plugins\agy-memory\scripts\server.js"
 ```
 
-Antigravity hot-loads plugins, so no restart is usually needed. If nothing shows up, restart it once.
-
-### Verify
+macOS / Linux:
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"memory_status","arguments":{}}}' \
   | node ~/.gemini/config/plugins/agy-memory/scripts/server.js
 ```
 
-Or open a new chat and ask it to run `memory_status`.
+Expected output is JSON containing the entry count for each track:
 
-## What it provides
+```json
+{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"{\n  \"home\": \"...\",\n  \"memory\": 0,\n  \"user\": 0,\n  \"projectLog\": 0,\n  \"today\": 0, ..."}]}}
+```
 
-**11 MCP tools** — `memory_add`, `memory_search`, `memory_list`, `memory_remove`, `memory_suggest_key`, `memory_promote_key`, `memory_pending`, `memory_drop`, `memory_context`, `memory_status`, `memory_sync`
+All track counts read `0` after a fresh installation. This is expected and indicates an empty library.
 
-**2 hooks** — `SessionStart` injects memory; `PreInvocation` re-injects only when the library changed (hash-gated, so it does not burn tokens every turn)
+No output, or a `Cannot find module` error, usually means the paths in `mcp_config.json` no longer match the plugin's actual location (for example, after moving the directory). Re-running `node scripts/install.js` corrects this.
 
-**1 rule** — `rules/AGENTS.md`, always on while the plugin is enabled: what to write, where, and what never to write
+As an alternative, open a new Antigravity session and request `memory_status`; if the tool responds, the installation succeeded.
 
-**1 skill** — `skills/agy-memory/SKILL.md`, loaded on demand: the operational how-to
+## Usage
 
-## The five tracks
+The plugin runs automatically. It executes at two points:
 
-| Track | File | Holds | Injected |
+- **New session**: injects global facts, user preferences, project key memory, and the current day's log
+- **After memory changes**: compares the content hash and tops up the injection when needed
+
+Active operations use natural-language instructions:
+
+| Instruction | Behaviour |
+|---|---|
+| "Record the agreement we just settled on" | Writes a `daily` entry |
+| "Do you remember the build script discussion?" | Calls `memory_search` |
+| "This pitfall is worth keeping long-term" | Calls `memory_suggest_key`, adding it to the pending queue |
+| "Confirm" / "Store it" | Calls `memory_promote_key`, promoting the proposal |
+| "Don't record this" | Calls `memory_drop`, discarding the proposal |
+
+The `key` track is the only track injected on every turn and therefore consumes tokens continuously. It cannot be written directly; proposals require both submission and confirmation. Pending proposals are never injected.
+
+Memory contents can be read directly: every file under `~/.antigravity-memory/` is Markdown.
+
+## Components
+
+| Type | Count | Description |
+|---|---|---|
+| MCP tools | 11 | `memory_add`, `memory_search`, `memory_list`, `memory_remove`, `memory_suggest_key`, `memory_promote_key`, `memory_pending`, `memory_drop`, `memory_context`, `memory_status`, `memory_sync` |
+| Hooks | 2 | `SessionStart` performs injection; `PreInvocation` tops up after changes |
+| Rule | 1 | `rules/AGENTS.md`, active while the plugin is enabled, defining write scope and prohibitions |
+| Skill | 1 | `skills/agy-memory/SKILL.md`, an on-demand operations manual |
+
+## Memory tracks
+
+| Track | File | Contents | Injected |
 |---|---|---|---|
-| `memory` | `MEMORY.md` | Cross-project facts: machine, env, paths, versions | ✅ |
-| `user` | `USER.md` | User preferences, how to address them, hard limits | ✅ |
-| `key` | `projects/<slug>.key.md` | Standing agreements, architecture decisions | ✅ |
-| `daily` | `daily/YYYY-MM-DD.md` | Day-by-day log | ✅ (today only) |
-| `project` | `projects/<slug>.md` | Per-project progress | ❌ (searchable) |
+| `memory` | `MEMORY.md` | Cross-project facts: machine, environment, paths, versions | Yes |
+| `user` | `USER.md` | User preferences, forms of address, constraints | Yes |
+| `key` | `projects/<slug>.key.md` | Standing agreements, architecture decisions | Yes |
+| `daily` | `daily/YYYY-MM-DD.md` | Daily log | Yes (current day only) |
+| `project` | `projects/<slug>.md` | Per-project progress | No (searchable) |
 
-`key` is the only track that costs tokens on every turn, so it cannot be written directly: `memory_suggest_key` queues a proposal, and `memory_promote_key` applies it after the user confirms. Pending proposals are never injected.
+Entries use the format `- [YYYY-MM-DD] content`, maintained by the tools. Manual edits are not recommended.
 
-Deletions move entries to `archive/` rather than erasing them.
+Deleted entries move to `archive/` rather than being physically erased, and can be restored.
 
 ## Configuration
 
-All optional, via environment variables.
+All optional, set through environment variables.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `AGY_MEMORY_HOME` | `~/.antigravity-memory` | Where the library lives |
-| `AGY_MEMORY_PROJECT` | process cwd | Workspace when the hook does not supply one |
-| `AGY_MEMORY_BUDGET` | `7000` | Character budget for the injected block |
-| `AGY_MEMORY_DEBUG` | — | Print hook errors to stderr |
+| `AGY_MEMORY_HOME` | `~/.antigravity-memory` | Memory library location |
+| `AGY_MEMORY_PROJECT` | process working directory | Fallback when the hook supplies no workspace |
+| `AGY_MEMORY_BUDGET` | `7000` | Character budget for injected content |
+| `AGY_MEMORY_DEBUG` | unset | Write hook errors to stderr |
 
-## Why the installer exists
+## Why an install script is required
 
-Two Antigravity behaviours make a static `hooks.json` impossible to ship:
+Two Antigravity behaviours make a static configuration file impossible to distribute directly, so the install script must generate configuration on the target machine.
 
-1. **Hook commands cannot quote their path on Windows.** Write `"C:\...\hook.cmd" SessionStart` and Antigravity treats the quoted string as the command *name*:
+**1. Hook commands cannot quote their path on Windows**
 
-   ```
-   '\"C:\Users\...\hook.cmd\"' is not recognized as an internal or external command
-   ```
+The following form causes the entire quoted string to be parsed as the command name:
 
-   Both nested-quote workarounds fail too. An unquoted absolute path works — and therefore **the plugin path must not contain spaces.** The installer checks this and refuses with instructions rather than installing something that will silently fail.
+```json
+"command": "\"C:\\Users\\...\\hook.cmd\" SessionStart"
+```
 
-2. **MCP `command` must be spawnable directly**, not a name resolved through a shell. Writing `node` works until it doesn't; writing the resolved `node.exe` path always does.
+Error output:
 
-So the installer resolves both paths on your machine. Re-run it after moving the plugin.
+```
+'\"C:\Users\...\hook.cmd\"' is not recognized as an internal or external command
+```
 
-> `hooks.template.json` and `mcp_config.template.json` are the shipped placeholders. They are overwritten by the installer — edit the templates only if you are changing what the installer generates.
+The two nested-quote alternatives are equally ineffective (one fails silently, the other reports a syntax error). An unquoted absolute path executes correctly, which means **the plugin installation path must not contain spaces**. The install script detects spaces in the path and refuses installation with alternatives, rather than generating a configuration that fails silently on every run.
 
-## Also worth knowing
+**2. The MCP `command` must be an executable path**
 
-- **`suggestedPrompts` is capped at 3.** Extra entries are silently truncated with only a log warning.
-- **Unknown `plugin.json` fields are silently dropped.** A typo does not error; it just does nothing.
-- **Hooks run synchronously and block the loop.** Both are capped at 10–15s, and a hook that throws still emits valid empty JSON so it can never wedge your agent.
+It cannot be a command name resolved through a shell. `node` works in most environments but breaks when PATH changes; the resolved absolute path to `node.exe` does not.
 
-## Localization
+Both paths must be resolved on the target machine, so the install script must be re-run after moving the plugin directory.
 
-The plugin ships English (`rules/AGENTS.md`, `skills/agy-memory/SKILL.md`). A Chinese rule set is at `docs/rules.zh-CN.md`:
+> `hooks.template.json` and `mcp_config.template.json` are shipped placeholders that the install script overwrites. They should be edited only when changing the generation logic.
+
+## Known limitations
+
+- **`suggestedPrompts` accepts at most 3 entries.** Additional entries are silently truncated, leaving only a warning in the log.
+- **Unknown fields in `plugin.json` are silently discarded.** A typo does not raise an error and does not take effect.
+- **Hooks execute synchronously and block the execution loop.** Timeouts are capped at 10–15 seconds. A hook that throws still emits valid empty JSON and will not interrupt the agent.
+
+## Interface language
+
+The shipped rule and skill are in English (`rules/AGENTS.md`, `skills/agy-memory/SKILL.md`). A Chinese rule set is provided at `docs/rules.zh-CN.md`. To enable it:
+
+Windows (PowerShell):
+
+```powershell
+Copy-Item docs\rules.zh-CN.md rules\AGENTS.md -Force
+```
+
+macOS / Linux:
 
 ```bash
 cp docs/rules.zh-CN.md rules/AGENTS.md
 ```
 
-Do not keep both — everything in `rules/` is merged and loaded, so two files means paying twice.
+All files under `rules/` are merged and loaded together. Keeping both versions doubles the token cost on every turn.
+
+## Uninstallation
+
+Remove hook and MCP configuration, retaining the memory library:
+
+```bash
+node scripts/install.js --uninstall
+```
+
+For complete removal, also delete the plugin directory:
+
+Windows (PowerShell):
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.gemini\config\plugins\agy-memory"
+```
+
+macOS / Linux:
+
+```bash
+rm -rf ~/.gemini/config/plugins/agy-memory
+```
+
+The memory library is located at `~/.antigravity-memory/`, independent of the plugin directory, and may be retained or deleted separately.
 
 ## License
 

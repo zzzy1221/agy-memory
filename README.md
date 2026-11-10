@@ -1,208 +1,255 @@
-# agy-memory · 反重力长期记忆
+# agy-memory
 
-> [English](README.en.md) · 中文（当前）
+面向 Google Antigravity 的跨会话长期记忆插件。
 
-给 [Google Antigravity](https://antigravity.google)（俗称「反重力」）加一条**跨会话的记忆**。
+> [English](README.en.md) · 中文
 
-Agent 换个对话就把前面的事忘光。这个插件给它一份活得下来的记忆，并且在它开始思考之前，先把该记得的部分注入上下文里。
+---
 
-**纯本地 · 零依赖 · 不联网 · 不要 API key · 不花钱。**
+## 概述
+
+Antigravity 的每个新会话都从空白上下文开始，此前对话中确立的约定、结论与经验不会保留。本插件在会话启动时将记忆注入上下文，使模型能够在开始推理前获得与当前项目相关的历史信息。
+
+数据完全存储于本地，无外部网络请求，无需 API 密钥，无额外费用。
+
+## 工作原理
 
 ```
-┌─ SessionStart hook ─────────────────────────────┐
-│  全局  +  用户  +  项目关键  +  今天            │  ──►  注入上下文
-└─────────────────────────────────────────────────┘
-              ▲                        │
-              │                        ▼
-        memory_add ...          ~/.antigravity-memory/
-                                  ├── MEMORY.md
-                                  ├── USER.md
-                                  ├── projects/<项目>.md
-                                  ├── projects/<项目>.key.md
-                                  ├── daily/2026-01-01.md
-                                  ├── archive/
-                                  └── suggestions.jsonl
+                ┌──────────────────────────┐
+   SessionStart │  全局 + 用户 + 项目关键   │ ──► 注入 system message
+      hook      │        + 当日记录        │
+                └──────────────────────────┘
+                             ▲
+                             │ memory_add
+                             │
+                ~/.antigravity-memory/
+                  ├── MEMORY.md              全局事实
+                  ├── USER.md                用户偏好
+                  ├── projects/<slug>.md     项目日志
+                  ├── projects/<slug>.key.md 项目关键记忆（每轮注入）
+                  ├── daily/YYYY-MM-DD.md    每日记录
+                  ├── archive/               已删除条目的归档
+                  └── suggestions.jsonl      待确认的提案队列
 ```
 
-## 它的设计取舍
+会话启动时，`SessionStart` hook 汇总四个来源（全局事实、用户偏好、项目关键记忆、当日记录）并注入上下文。记忆内容发生变化后，`PreInvocation` hook 按内容哈希判断是否需要补充注入，避免重复占用 token。
 
-这个插件是按四条硬约束设计的，每条都对应一个具体做法：
+## 设计约束
 
-**1. 只花你已经在花的钱。** 不引入额外的 API key，不调用任何抽取或摘要模型。写记忆由正在跟你对话的那个模型顺手完成，一次工具调用，不多一轮请求。
+本插件围绕四条约束构建，每一条都对应明确的实现选择。
 
-**2. 不联网。** 记忆存在本机 `~/.antigravity-memory/`，没有任何出站请求。不需要注册账号，也没有服务端要知道你记了什么。
+**一、不产生额外调用成本**
+不引入独立 API 密钥，不调用额外的抽取或摘要模型。记忆由当前对话中的模型通过一次工具调用写入，不产生额外的模型请求。
 
-**3. 用 Markdown 存，不用数据库。** 好处是可读、可 diff、可手改、可放进你自己的备份。插件坏了或者你不想用了，记忆不会跟着废掉 —— 打开文件就能看，想知道它到底记住了什么不用装任何工具。
+**二、无网络通信**
+记忆存储于本地 `~/.antigravity-memory/`，无任何出站请求，无需注册账号，无服务端参与。
 
-**4. 不常驻。** 没有后台进程、没有端口、没有开机自启。全程只有两种存在方式：Antigravity 调 hook 的那一下，和 Antigravity 调工具的那一下。剩下时间它不存在，不占内存也不耗电。
+**三、以 Markdown 为存储格式**
+便于阅读、版本控制、手工编辑与纳入既有备份流程。插件停止使用或出现故障时，记忆数据本身不受影响，可直接以文本编辑器查阅，无需额外工具。
 
-对应到能力边界：**它没有语义搜索。** `memory_search` 是子串匹配，几百条很够用，上万条会力不从心。这是换取上面四条（零依赖、零成本、纯本地、可读可改）的代价，写在明面上。
+**四、无常驻进程**
+无后台进程、无监听端口、无开机自启。仅在 hook 触发与工具调用两个时刻执行，其余时间不占用系统资源。
 
-如果你要的是另一种取舍 —— 大规模语义检索、或者团队共享记忆库 —— 那是另一个方向的产品，这个插件不是冲着那个去的。
+## 能力边界
+
+记忆检索为**子串匹配**，不提供语义搜索。条目数量在数百级别时可满足需求；数量级达到上万条时检索效率会下降。这是上述四条约束（零依赖、零成本、纯本地、可读可改）的直接结果。
+
+如需大规模语义检索或团队共享记忆库，应选择其他技术方案。
+
+## 环境要求
+
+| 项目 | 要求 |
+|---|---|
+| Node.js | 18 或更高版本 |
+| Antigravity | 已安装并可正常运行 |
 
 ## 安装
 
-前置只要一个：**Node.js 18+**。Antigravity 得先装好。
-
 ```bash
-git clone https://github.com/<你的账号>/agy-memory.git
+git clone https://github.com/zzzy1221/agy-memory.git
 cd agy-memory
 node scripts/install.js
 ```
 
-拿到目录的方式无所谓（git、zip、从别的机器拷过来都行），只要在插件目录里跑安装器就够了 —— 它不需要 git。
+安装不依赖 git，也可通过压缩包或目录拷贝获取插件后，在插件目录内执行安装脚本。
 
-安装器会把插件复制到 `~/.gemini/config/plugins/agy-memory/`，然后**按你这台机器的绝对路径生成 `hooks.json` 和 `mcp_config.json`**，最后自检一遍。
+安装脚本执行三项操作：
 
-最后这一步不是偷懒，原因见[为什么非得有安装器](#为什么非得有安装器)。
+1. 将插件复制到 `~/.gemini/config/plugins/agy-memory/`
+2. 依据本机路径生成 `hooks.json` 与 `mcp_config.json`
+3. 校验生成的路径是否存在、命令是否被引号包裹
 
-常用选项：
+第 2 步的必要性见[安装脚本的作用](#安装脚本的作用)。
 
-```bash
-node scripts/install.js --dry-run          # 只打印要写什么，不落盘
-node scripts/install.js --no-hooks         # 只装 MCP 工具，不要自动注入
-node scripts/install.js --uninstall        # 撤掉 hook 和 MCP 配置（记忆库保留）
-AGY_PLUGIN_DIR=/自定义/路径 node scripts/install.js
-```
+### 命令行选项
 
-Antigravity 热加载插件，通常不用重启。要是没反应，重开一次。
+| 选项 | 说明 |
+|---|---|
+| `--dry-run` | 仅输出将要写入的内容，不修改文件系统 |
+| `--no-hooks` | 仅安装 MCP 工具，不启用自动注入 |
+| `--uninstall` | 移除 hook 与 MCP 配置，保留记忆库 |
+| `AGY_PLUGIN_DIR=<path>` | 指定安装目录 |
 
-### 验证装好了没
+Antigravity 支持插件热加载，通常无需重启。若插件未生效，重启一次。
 
-PowerShell（Windows）：
+### 验证安装
+
+Windows（PowerShell）：
 
 ```powershell
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"memory_status","arguments":{}}}' | node "$env:USERPROFILE\.gemini\config\plugins\agy-memory\scripts\server.js"
 ```
 
-bash / zsh（macOS、Linux）：
+macOS / Linux：
 
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"memory_status","arguments":{}}}' \
   | node ~/.gemini/config/plugins/agy-memory/scripts/server.js
 ```
 
-回一段带各轨条数的 JSON，就是活的：
+预期输出为包含各轨道条目数的 JSON：
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"{\n  \"home\": \"...\",\n  \"memory\": 1,\n  \"user\": 1,\n  \"projectLog\": 0,\n  \"today\": 0, ..."}]}}
+{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"{\n  \"home\": \"...\",\n  \"memory\": 0,\n  \"user\": 0,\n  \"projectLog\": 0,\n  \"today\": 0, ..."}]}}
 ```
 
-刚装完各轨条数都是 `0`，这是正常的 —— 库还是空的，等它记第一条。
+首次安装后各轨道计数为 `0` 属正常现象，表示记忆库为空。
 
-要是没输出、或者报 `Cannot find module`，那大概率是 `mcp_config.json` 里的路径不对（比如把插件目录挪了位置）。重跑一次 `node scripts/install.js` 就好。
+若无输出，或出现 `Cannot find module` 错误，通常为 `mcp_config.json` 中的路径与实际位置不一致（例如插件目录被移动）。重新执行 `node scripts/install.js` 即可修复。
 
-更省事的办法：在 Antigravity 里新开一个对话，直接说「跑一下 memory_status」，它调得出来就说明装好了。
+也可在 Antigravity 中新建会话并请求执行 `memory_status`，工具可正常调用即表示安装成功。
 
-## 装了之后怎么用
+## 使用方法
 
-**不用专门「用」。** 正常聊天就行，它自己在这两个点动：
+插件在后台自动运行，无需手动触发。两个执行时机：
 
-- **开新对话** → 把记忆注入进去（全局事实 + 你的偏好 + 本项目长期约定 + 今天的记录）
-- **你让它记了东西之后** → hash 变了，下一轮补注入一次
+- **新建会话**：注入全局事实、用户偏好、项目关键记忆与当日记录
+- **记忆内容变更后**：按内容哈希判断，需要时补充注入
 
-想主动操作，对着 Antigravity 说人话就行：
+主动操作通过自然语言指令完成：
 
-| 你说 | 它做什么 |
+| 指令 | 对应行为 |
 |---|---|
-| 「把这轮定下来的约定记下来」 | 写一条 `daily` |
-| 「上次那个构建脚本的事你还记得吗」 | 调 `memory_search` 去查 |
-| 「这个坑值得长期记着」 | 走 `memory_suggest_key` 进待确认队列 |
-| 「确认」「记进去」 | `memory_promote_key` 才真正生效 |
-| 「这个不用记」 | `memory_drop` 丢掉提案 |
+| 「把这轮定下来的约定记下来」 | 写入一条 `daily` 记录 |
+| 「上次那个构建脚本的事你还记得吗」 | 调用 `memory_search` 检索 |
+| 「这个坑值得长期记着」 | 调用 `memory_suggest_key`，进入待确认队列 |
+| 「确认」／「记进去」 | 调用 `memory_promote_key`，提案正式生效 |
+| 「这个不用记」 | 调用 `memory_drop`，丢弃提案 |
 
-**待确认这一步是故意的。** `key` 轨每轮都注入，花的是每次对话的 token，所以不能让模型自己拍板。
+`key` 轨道为唯一每轮注入的轨道，会持续占用 token，因此不接受直接写入，须经提案与确认两个步骤。待确认的提案永远不会被注入。
 
-想直接看它记了什么：打开 `~/.antigravity-memory/`，全是 Markdown，记事本就能开。
+记忆内容可直接查阅：`~/.antigravity-memory/` 下的全部文件均为 Markdown 格式。
 
-## 它提供什么
+## 组件构成
 
-**11 个 MCP 工具** —— `memory_add`、`memory_search`、`memory_list`、`memory_remove`、`memory_suggest_key`、`memory_promote_key`、`memory_pending`、`memory_drop`、`memory_context`、`memory_status`、`memory_sync`
+| 类型 | 数量 | 说明 |
+|---|---|---|
+| MCP 工具 | 11 | `memory_add`、`memory_search`、`memory_list`、`memory_remove`、`memory_suggest_key`、`memory_promote_key`、`memory_pending`、`memory_drop`、`memory_context`、`memory_status`、`memory_sync` |
+| Hook | 2 | `SessionStart` 负责注入；`PreInvocation` 在内容变更后补充注入 |
+| 规则 | 1 | `rules/AGENTS.md`，插件启用期间常驻，定义写入范围与禁止项 |
+| 技能 | 1 | `skills/agy-memory/SKILL.md`，按需加载的操作手册 |
 
-**2 个 hook** —— `SessionStart` 负责注入；`PreInvocation` 只在记忆真的变了之后补一次（按 hash 判断，所以不会每轮都白烧 token）
+## 记忆轨道
 
-**1 条规则** —— `rules/AGENTS.md`，插件启用期间常驻：写什么、写在哪、什么不许写
-
-**1 个技能** —— `skills/agy-memory/SKILL.md`，按需加载的操作手册
-
-## 五条轨道
-
-| 轨道 | 文件 | 放什么 | 是否注入 |
+| 轨道 | 文件 | 内容 | 是否注入 |
 |---|---|---|---|
-| `memory` | `MEMORY.md` | 跨项目事实：机器、环境、路径、版本 | ✅ |
-| `user` | `USER.md` | 用户偏好、称呼、雷区 | ✅ |
-| `key` | `projects/<项目>.key.md` | 长期约定、架构决策 | ✅ |
-| `daily` | `daily/YYYY-MM-DD.md` | 每日日志 | ✅（只注入今天） |
-| `project` | `projects/<项目>.md` | 单项目进展 | ❌（可搜索） |
+| `memory` | `MEMORY.md` | 跨项目事实：机器、环境、路径、版本 | 是 |
+| `user` | `USER.md` | 用户偏好、称呼、约束 | 是 |
+| `key` | `projects/<slug>.key.md` | 长期约定、架构决策 | 是 |
+| `daily` | `daily/YYYY-MM-DD.md` | 每日记录 | 是（仅当日） |
+| `project` | `projects/<slug>.md` | 单项目进展 | 否（可检索） |
 
-`key` 是唯一每轮都花 token 的轨道，所以不能直接写：`memory_suggest_key` 先排队，用户确认后 `memory_promote_key` 才落地。**待确认的提案永远不会被注入。**
+条目格式为 `- [YYYY-MM-DD] 内容`，由工具维护，不建议手工修改。
 
-删掉的条目会移到 `archive/`，不是真的抹掉。
+删除的条目移入 `archive/`，不做物理擦除，可恢复。
 
-## 配置
+## 配置项
 
-全部可选，走环境变量。
+全部可选，通过环境变量设置。
 
 | 变量 | 默认值 | 作用 |
 |---|---|---|
-| `AGY_MEMORY_HOME` | `~/.antigravity-memory` | 记忆库放哪 |
-| `AGY_MEMORY_PROJECT` | 进程 cwd | hook 没给工作区时的兜底 |
-| `AGY_MEMORY_BUDGET` | `7000` | 注入块的字符预算 |
-| `AGY_MEMORY_DEBUG` | — | 把 hook 的报错打到 stderr |
+| `AGY_MEMORY_HOME` | `~/.antigravity-memory` | 记忆库存储位置 |
+| `AGY_MEMORY_PROJECT` | 进程工作目录 | hook 未提供工作区时的回退值 |
+| `AGY_MEMORY_BUDGET` | `7000` | 注入内容的字符预算 |
+| `AGY_MEMORY_DEBUG` | 未设置 | 将 hook 错误输出至 stderr |
 
-## 为什么非得有安装器
+## 安装脚本的作用
 
-Antigravity 的两处行为，让静态的 `hooks.json` 没法直接发出去：
+Antigravity 的两项行为使静态配置文件无法直接分发，因此必须由安装脚本在目标机器上生成配置。
 
-**1. Windows 上 hook 命令不能给路径加引号。** 写成 `"C:\...\hook.cmd" SessionStart`，Antigravity 会把引号里那一整串当成命令**名字**：
+**一、Windows 环境下 hook 命令不能为路径添加引号**
+
+以下写法会将引号内的完整字符串解析为命令名称：
+
+```json
+"command": "\"C:\\Users\\...\\hook.cmd\" SessionStart"
+```
+
+错误输出：
 
 ```
 '\"C:\Users\...\hook.cmd\"' 不是内部或外部命令，也不是可运行的程序
 ```
 
-嵌套引号的两种绕法也都不行（实测：一种静默失败，一种报语法错误）。**裸的绝对路径能跑** —— 所以**插件路径里不能有空格**。安装器会检查这一点，带空格直接拒装并给出去路，而不是装一个每轮静默失败的东西。
+嵌套引号的两种替代写法同样无效（一种静默失败，一种报告语法错误）。未加引号的绝对路径可以正常执行，因此**插件安装路径不得包含空格**。安装脚本会检测路径中的空格，如存在则拒绝安装并给出替代方案，而非生成一个每次运行都会静默失败的配置。
 
-**2. MCP 的 `command` 必须能直接 spawn**，不能是靠 shell 解析的命令名。写 `node` 平时没事，但哪天 PATH 变了就废；写解析出来的 `node.exe` 绝对路径一直能用。
+**二、MCP 的 `command` 必须为可执行文件路径**
 
-所以这两个路径都得在你的机器上解析。**把插件挪了位置，重跑一次安装器。**
+不能使用依赖 shell 解析的命令名。`node` 在多数环境下可用，但 PATH 变更后会失效；使用解析后的 `node.exe` 绝对路径则不受影响。
 
-> `hooks.template.json` 和 `mcp_config.template.json` 是随包发的占位模板，会被安装器覆盖。只有你想改「安装器生成什么」的时候才去动它们。
+两项路径均需在目标机器上解析，因此插件目录移动后须重新执行安装脚本。
 
-## 另外几个坑，早知道早省事
+> `hooks.template.json` 与 `mcp_config.template.json` 为随包分发的占位模板，会被安装脚本覆盖。仅在需要修改生成逻辑时才应编辑模板。
 
-- **`suggestedPrompts` 最多 3 条。** 多给的会静默截断，只在日志里留一句警告。
-- **`plugin.json` 里不认识的字段会被静默丢弃。** 拼错了不报错，就是不生效 —— 别以为写上了。
-- **hook 是同步执行的，会阻塞执行循环。** 两个都限了 10~15 秒；就算 hook 抛异常，它也会吐一份合法的空 JSON，不会把你的 agent 卡死。
+## 已知限制
+
+- **`suggestedPrompts` 最多 3 条**，超出部分被静默截断，仅在日志中留下警告。
+- **`plugin.json` 中的未知字段被静默丢弃**，拼写错误不会报错，但也不会生效。
+- **hook 为同步执行，会阻塞执行循环**，单次超时限制为 10–15 秒。hook 抛出异常时仍会输出合法的空 JSON，不会导致 agent 中断。
 
 ## 界面语言
 
-插件随包发的是**英文**（`rules/AGENTS.md`、`skills/agy-memory/SKILL.md`），因为要发社区。中文规则在 `docs/rules.zh-CN.md`，想用中文覆盖过去：
+随包分发的规则与技能为英文（`rules/AGENTS.md`、`skills/agy-memory/SKILL.md`）。中文规则位于 `docs/rules.zh-CN.md`，如需启用：
+
+Windows（PowerShell）：
 
 ```powershell
 Copy-Item docs\rules.zh-CN.md rules\AGENTS.md -Force
 ```
 
+macOS / Linux：
+
 ```bash
-# macOS / Linux
 cp docs/rules.zh-CN.md rules/AGENTS.md
 ```
 
-**别两份都留。** `rules/` 目录下的文件会被全部合并加载，两份就是每轮付双倍 token。
+`rules/` 目录下的文件会被全部合并加载，不应同时保留两份，否则每轮对话将承担双倍 token 开销。
 
 ## 卸载
 
+移除 hook 与 MCP 配置，保留记忆库：
+
 ```bash
-node scripts/install.js --uninstall   # 只撤 hook 和 MCP 配置，记忆库留着
+node scripts/install.js --uninstall
 ```
 
-彻底删干净，再把插件目录删掉即可：
+完整移除，另需删除插件目录：
+
+Windows（PowerShell）：
 
 ```powershell
 Remove-Item -Recurse -Force "$env:USERPROFILE\.gemini\config\plugins\agy-memory"
 ```
 
-记忆库在 `~/.antigravity-memory/`，想留就留着，不想要了再删。
+macOS / Linux：
+
+```bash
+rm -rf ~/.gemini/config/plugins/agy-memory
+```
+
+记忆库位于 `~/.antigravity-memory/`，独立于插件目录，可按需保留或删除。
 
 ## 许可
 
-MIT，见 [LICENSE](LICENSE)。
+MIT，详见 [LICENSE](LICENSE)。
