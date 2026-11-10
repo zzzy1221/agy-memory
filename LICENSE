@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 agy-memory contributors
+Copyright (c) 2026 zzzy1221
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,22 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## Third-party attribution
+
+The layered memory design in this project is derived from dsh-memory-evolve:
+
+    dsh-memory-evolve
+    https://github.com/csyangwen/dsh-memory-evolve
+    MIT License
+    Copyright (c) 2026 dsh-external
+
+No source code from that project is included here. What was adopted is the
+design concept (five-track layering, injection at session start, two-step
+confirmation for key memory, archiving rather than deletion). The
+implementation in this repository is independent. See docs/ATTRIBUTION.md.
+
+The MIT License above applies to this project's own code. The upstream
+project's MIT License continues to apply to its own code.

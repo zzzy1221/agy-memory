@@ -253,3 +253,13 @@ The memory library is located at `~/.antigravity-memory/`, independent of the pl
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Attribution
+
+The layered memory model is derived from [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve) by csyangwen (MIT License, Copyright (c) 2026 dsh-external).
+
+What was adopted is the design: five-track layering, injection at session start, the two-step confirmation path for key memory, archiving rather than deletion, and a single entry written when a turn ends. The implementation is independent and targets Antigravity; no upstream source code was copied. The Antigravity adaptation layer (hook contract, MCP server, configuration generation, install script) is original to this project.
+
+Not adopted: git-branch tracks, self-evolution, todo management, CLI dispatch, and the WebUI.
+
+Full details in [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md).

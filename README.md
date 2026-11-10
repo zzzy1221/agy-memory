@@ -253,3 +253,13 @@ rm -rf ~/.gemini/config/plugins/agy-memory
 ## 许可
 
 MIT，详见 [LICENSE](LICENSE)。
+
+## 来源与致谢
+
+本插件的分层记忆模型参照 [dsh-memory-evolve](https://github.com/csyangwen/dsh-memory-evolve)（作者 csyangwen，MIT 许可，Copyright (c) 2026 dsh-external）。
+
+参照的是设计思路：五轨分层、启动时注入、关键记忆两步确认、归档而非删除、收尾写入单条。代码为针对 Antigravity 的独立实现，未复制上游源码。Antigravity 适配层（hook 契约、MCP 服务、配置生成、安装脚本）为本项目自有。
+
+未沿用的部分：GIT 分支轨道、自我进化、待办管理、CLI 调度、WebUI。
+
+完整说明见 [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md)。
