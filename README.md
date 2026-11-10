@@ -41,10 +41,12 @@ That also means it is honest about its ceiling: **no semantic search.** `memory_
 Requires **Node.js 18+**. Antigravity must already be installed.
 
 ```bash
-git clone https://github.com/<you>/agy-memory.git
+git clone https://github.com/<your-account>/agy-memory.git
 cd agy-memory
 node scripts/install.js
 ```
+
+Or, once you have a copy by any means (tarball, zip, another machine), just run the installer from the plugin directory — it does not need git.
 
 The installer copies the plugin to `~/.gemini/config/plugins/agy-memory/`, then **writes `hooks.json` and `mcp_config.json` with your machine's absolute paths** and self-checks them.
 
